@@ -386,6 +386,7 @@ fun FreshFindCard(
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .size(32.dp)
+                    .clickable { /* Toggle favorite */ }
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -449,27 +450,38 @@ fun ExploreLocalGrid(
     items: List<HomeListingUi>,
     onListingClick: (String) -> Unit
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.height(800.dp),
-        userScrollEnabled = false
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(items.size) { index ->
-            val item = items[index]
-            ExploreCard(
-                item = ExploreItem(
-                    id = item.id,
-                    imageUrl = item.imageUrl,
-                    price = item.priceText,
-                    title = item.title,
-                    location = item.locationText,
-                    backgroundColor = Color(0xFF3D2E1F) // temp
-                ),
-                onClick = { onListingClick(item.id) }
-            )
+        // Create rows of 2 items each
+        items.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                rowItems.forEach { item ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        ExploreCard(
+                            item = ExploreItem(
+                                id = item.id,
+                                imageUrl = item.imageUrl,
+                                price = item.priceText,
+                                title = item.title,
+                                location = item.locationText,
+                                backgroundColor = Color(0xFF3D2E1F)
+                            ),
+                            onClick = { onListingClick(item.id) }
+                        )
+                    }
+                }
+                // Add spacer if odd number of items in row
+                if (rowItems.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -486,27 +498,22 @@ fun ExploreCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clickable(onClick = onClick),
+            .height(240.dp)
+            .clickable(onClick = onClick),  // 🔥 ADD THIS LINE
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2416))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Image with background color
-            Box(
+            // Image - EXACT same as FreshFindCard
+            AsyncImage(
+                model = item.imageUrl,
+                contentDescription = item.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .background(item.backgroundColor)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            ) {
-                AsyncImage(
-                    model = item.imageUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
+                    .height(160.dp)  // Same as FreshFindCard
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                contentScale = ContentScale.Crop
+            )
 
             // Favorite heart icon
             Surface(
@@ -516,6 +523,7 @@ fun ExploreCard(
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .size(32.dp)
+                    .clickable { /* Toggle favorite */ }
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -527,7 +535,24 @@ fun ExploreCard(
                 }
             }
 
-            // Info section at bottom
+            // Price tag - EXACT same positioning as FreshFindCard
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = GoldPrimary,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 88.dp)  // Same as FreshFindCard
+            ) {
+                Text(
+                    text = item.price,
+                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            // Info section at bottom - EXACT same
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -535,25 +560,18 @@ fun ExploreCard(
                     .padding(12.dp)
             ) {
                 Text(
-                    text = item.price,
-                    color = GoldPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
                     text = item.title,
                     color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
+                    fontSize = 14.sp,  // Same as FreshFindCard
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = item.location,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,  // Same as FreshFindCard
                     maxLines = 1
                 )
             }

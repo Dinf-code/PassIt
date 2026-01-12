@@ -13,6 +13,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import com.dinachi.passit.viewmodel.ChatThread
+import com.google.firebase.firestore.FieldValue
 
 class FirestoreDataSource(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -22,7 +24,7 @@ class FirestoreDataSource(
     // Collections
     private val listingsCol get() = db.collection("listings")
     private val usersCol get() = db.collection("users")
-    private fun messagesCol(chatRoomId: String) = db.collection("chats").document(chatRoomId).collection("messages")
+    private fun messagesCol(chatRoomId: String) = db.collection("chatRooms").document(chatRoomId).collection("messages")
 
     fun currentUserId(): String? = auth.currentUser?.uid
 
@@ -224,38 +226,118 @@ class FirestoreDataSource(
     /**
      * Send a text message
      */
-    suspend fun sendMessage(chatRoomId: String, receiverId: String, text: String) {
-        val senderId = currentUserId() ?: error("Not logged in")
-        val now = System.currentTimeMillis()
-        val msgRef = messagesCol(chatRoomId).document()
+    /**
+     * Send a text message
+     */
+    suspend fun sendMessage(
+        chatRoomId: String,
+        receiverId: String,
+        text: String,
+        listingTitle: String? = null,
+        listingPhotoUrl: String? = null,
+        otherUserName: String? = null,
+        otherUserPhotoUrl: String? = null
+    ) {
+        val currentUser = auth.currentUser ?: throw Exception("Not logged in")
+        val senderId = currentUser.uid
 
-        val payload = mapOf(
-            "id" to msgRef.id,
-            "chatRoomId" to chatRoomId,
+        // Create message document
+        val messageRef = db.collection("chatRooms")
+            .document(chatRoomId)
+            .collection("messages")
+            .document()
+
+        val message = hashMapOf(
+            "id" to messageRef.id,
             "senderId" to senderId,
-            "messageText" to text,  // ← Changed from "message"
-            "timestamp" to now,
-            "isRead" to false,
-            "imageUrl" to null
+            "text" to text,
+            "timestamp" to System.currentTimeMillis(),
+            "isRead" to false
         )
 
-        msgRef.set(payload).await()
+        // Update chat room metadata
+        val chatRoomRef = db.collection("chatRooms").document(chatRoomId)
+
+        // First, check if chat room exists, if not create it
+        val chatRoomDoc = chatRoomRef.get().await()
+        if (!chatRoomDoc.exists()) {
+            val parts = chatRoomId.split("_")
+            val listingId = if (parts.size > 1) parts[1] else ""
+            val participants = if (parts.size > 3) listOf(parts[2], parts[3]) else listOf(senderId, receiverId)
+
+            val chatRoomData = hashMapOf<String, Any>(
+                "participants" to participants,
+                "listingId" to listingId,
+                "createdAt" to System.currentTimeMillis()
+            )
+
+            // Add metadata if provided
+            if (listingTitle != null) chatRoomData["listingTitle"] = listingTitle
+            if (listingPhotoUrl != null) chatRoomData["listingPhotoUrl"] = listingPhotoUrl
+            if (otherUserName != null) chatRoomData["otherUserName"] = otherUserName
+            if (otherUserPhotoUrl != null) chatRoomData["otherUserPhotoUrl"] = otherUserPhotoUrl
+
+            chatRoomRef.set(chatRoomData).await()
+        }
+
+        // Update last message info
+        val updates = hashMapOf<String, Any>(
+            "lastMessage" to text,
+            "lastMessageTimestamp" to System.currentTimeMillis(),
+            "lastMessageSenderId" to senderId
+        )
+
+        // Update unread count for receiver
+        if (receiverId.isNotEmpty()) {
+            updates["unreadCount.$receiverId"] = FieldValue.increment(1)
+        }
+
+        // Batch write: message + chat room update
+        db.runBatch { batch ->
+            batch.set(messageRef, message)
+            batch.update(chatRoomRef, updates)
+        }.await()
     }
 
     /**
-     * Mark messages as read
+     * Observe all chat threads (conversations) for a user
+     * Returns real-time updates of all chats where user is a participant
      */
-    suspend fun markMessagesAsRead(chatRoomId: String, userId: String) {
-        // TODO: Update all messages where receiverId == userId to isRead = true
-        // This requires a batch write
-    }
+    fun observeChatThreads(currentUserId: String): Flow<List<ChatThread>> = callbackFlow {
+        val listener = db.collection("chatRooms")  // FIXED: use 'db' not 'firestore'
+            .whereArrayContains("participants", currentUserId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
 
-    /**
-     * Delete a message
-     */
-    suspend fun deleteMessage(messageId: String) {
-        // TODO: Need to know chatRoomId to delete
-        // For now, this is a placeholder
+                if (snapshot != null) {
+                    val threads = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            val participants = doc.get("participants") as? List<String> ?: emptyList()
+                            val otherUserId = participants.firstOrNull { it != currentUserId }
+
+                            ChatThread(
+                                chatRoomId = doc.id,
+                                listingId = doc.getString("listingId"),
+                                listingTitle = doc.getString("listingTitle"),
+                                otherUserId = otherUserId,
+                                otherUserName = doc.getString("otherUserName"),
+                                otherUserPhotoUrl = doc.getString("otherUserPhotoUrl"),
+                                lastMessageText = doc.getString("lastMessage"),
+                                lastMessageTimestamp = doc.getLong("lastMessageTimestamp"),
+                                unreadCount = (doc.get("unreadCount") as? Map<String, Long>)?.get(currentUserId)?.toInt() ?: 0
+                            )
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    trySend(threads)
+                }
+            }
+
+        awaitClose { listener.remove() }
     }
 }
 
@@ -322,8 +404,13 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toListingOrNull(): Li
         favoriteCount = (getLong("favoriteCount") ?: 0L).toInt(),
         isSold = getBoolean("isSold") ?: false  // ← Changed from status
     )
+
+
 }
 
+/**
+ * Convert Firestore document to ChatMessage
+ */
 /**
  * Convert Firestore document to ChatMessage
  */
@@ -333,10 +420,10 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toChatMessageOrNull()
         id = getString("id") ?: id,
         chatRoomId = getString("chatRoomId") ?: "",
         senderId = getString("senderId") ?: "",
-        messageText = getString("messageText") ?: getString("message") ?: "",  // ← Support both
+        messageText = getString("text") ?: getString("messageText") ?: getString("message") ?: "",  // ✅ FIXED: Check "text" first
         timestamp = getLong("timestamp") ?: 0L,
         isRead = getBoolean("isRead") ?: false,
-        imageUrl = getString("imageUrl")  // ← Changed
+        imageUrl = getString("imageUrl")
     )
 }
 

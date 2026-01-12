@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    id("kotlin-kapt")
 }
 
 android {
@@ -61,32 +62,35 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    kapt("androidx.room:room-compiler:2.8.4")
+
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
 
     // Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
 
-    // Firebase products
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-storage-ktx")
+// Firebase products (no version needed when using BoM)
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
 
     // Coroutines support for Firebase
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // Material Icons Extended (adds 2000+ more icons)
-    implementation("androidx.compose.material:material-icons-extended:1.6.0")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     // Coil for image loading
-    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.12.2")
 
     //Navigation
-    implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation("androidx.navigation:navigation-compose:2.9.6")
 
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
 
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dinachi.passit.storage.RepositoryProvider
+import com.dinachi.passit.storage.remote.FirebaseSeeder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,16 +99,17 @@ class AuthViewModel(
      * Handle Login
      */
     fun login() {
-        // Validate inputs
         if (!validateLoginInputs()) return
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
             try {
-                // TODO: Call AuthRepo.login(email, password)
-                // For now, simulate success
-                kotlinx.coroutines.delay(1000) // Simulate network call
+                // Actually call Firebase Auth
+                authRepo.signInWithEmail(_uiState.value.email, _uiState.value.password)
+
+                // 🔥 SEED DATA (run once, then remove this line)
+                FirebaseSeeder.seedFirebaseData()
 
                 // On success, navigate to home
                 _navigationEvent.value = AuthNavigationEvent.NavigateToHome
@@ -125,15 +127,18 @@ class AuthViewModel(
      * Handle Sign Up
      */
     fun signUp() {
-        // Validate inputs
         if (!validateSignUpInputs()) return
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
             try {
-                // TODO: Call AuthRepo.signUp(email, password, name)
-                kotlinx.coroutines.delay(1000) // Simulate network call
+                // Actually call Firebase Auth
+                authRepo.signUpWithEmail(
+                    email = _uiState.value.email,
+                    password = _uiState.value.password,
+                    name = _uiState.value.name
+                )
 
                 // On success, navigate to home
                 _navigationEvent.value = AuthNavigationEvent.NavigateToHome
@@ -146,7 +151,6 @@ class AuthViewModel(
             }
         }
     }
-
     /**
      * Handle Google Sign In
      */

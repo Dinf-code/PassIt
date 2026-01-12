@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.dinachi.passit.AppWide.AppNavigation
 import com.dinachi.passit.AppWide.MainScaffold
 import com.dinachi.passit.ui.theme.PassItTheme
+import com.google.firebase.auth.FirebaseAuth  // ADD THIS
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,23 +19,21 @@ class MainActivity : ComponentActivity() {
             PassItTheme {
                 val navController = rememberNavController()
 
-                // TODO: Get actual user ID from AuthViewModel after login
-                val currentUserId = "temp_user_123" // Placeholder for now
+                // ✅ GET REAL USER ID FROM FIREBASE AUTH
+                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                val isUserLoggedIn = currentUserId.isNotEmpty()
 
                 MainScaffold(
                     navController = navController,
-                    currentUserId = currentUserId  // ← ADDED
+                    currentUserId = currentUserId
                 ) { controller ->
                     AppNavigation(
                         navController = controller,
-                        isUserLoggedIn = false,
-                        currentUserId = currentUserId  // ← ADDED
+                        isUserLoggedIn = isUserLoggedIn,  // ✅ FIXED
+                        currentUserId = currentUserId
                     )
                 }
             }
         }
     }
-
 }
-
-

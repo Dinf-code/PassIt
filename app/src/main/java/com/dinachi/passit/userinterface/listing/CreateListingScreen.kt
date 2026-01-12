@@ -152,7 +152,8 @@ fun CreateListingScreen(
                 onCategoryClick = { showCategorySheet = true },
                 description = uiState.description,
                 onDescriptionChange = { viewModel.onDescriptionChange(it) },
-                descriptionError = uiState.descriptionError
+                descriptionError = uiState.descriptionError,
+                convertedPriceUSD = uiState.convertedPriceUSD
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -372,7 +373,8 @@ fun DetailsSection(
     onCategoryClick: () -> Unit,
     description: String,
     onDescriptionChange: (String) -> Unit,
-    descriptionError: String?
+    descriptionError: String?,
+    convertedPriceUSD: String = "0.00"
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp)
@@ -503,7 +505,7 @@ fun DetailsSection(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "$0.00 USD is based on current rates.",
+                text = "$${convertedPriceUSD} USD is based on current rates.",
                 fontSize = 12.sp,
                 color = Color.White.copy(alpha = 0.5f)
             )

@@ -1,5 +1,6 @@
 package com.dinachi.passit.viewmodel
 
+
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -23,6 +24,7 @@ class ListingViewModel(
 
     private val repo = RepositoryProvider.provideListingRepo()
     private val imageRepo = RepositoryProvider.provideImageRepo()
+    private val exchangeRateRepo = RepositoryProvider.provideExchangeRateRepo()  // ✅ ADDED
 
     // ==================== DETAIL SCREEN STATE ====================
 
@@ -101,19 +103,72 @@ class ListingViewModel(
     }
 
     /**
-     * Update listing price
+     * Update listing price - NOW WITH LIVE CONVERSION! ✅
      */
     fun onPriceChange(price: String) {
         // Only allow numbers and decimal point
         val filtered = price.filter { it.isDigit() || it == '.' }
-        _createUiState.update { it.copy(price = filtered, priceError = null) }
+        _createUiState.update {
+            it.copy(price = filtered, priceError = null)
+        }
+
+        // Convert to USD in background using live API
+        viewModelScope.launch {
+            val priceDouble = filtered.toDoubleOrNull() ?: 0.0
+            val currency = _createUiState.value.selectedCurrency
+
+            if (priceDouble > 0) {
+                try {
+                    val convertedAmount = if (currency == "USD") {
+                        priceDouble
+                    } else {
+                        val rate = exchangeRateRepo.getExchangeRate(currency, "USD")
+                        priceDouble * rate
+                    }
+                    _createUiState.update {
+                        it.copy(convertedPriceUSD = String.format("%.2f", convertedAmount))
+                    }
+                } catch (e: Exception) {
+                    // If conversion fails, just show original amount
+                    _createUiState.update {
+                        it.copy(convertedPriceUSD = String.format("%.2f", priceDouble))
+                    }
+                }
+            } else {
+                _createUiState.update {
+                    it.copy(convertedPriceUSD = "0.00")
+                }
+            }
+        }
     }
 
     /**
-     * Update currency
+     * Update currency - NOW WITH LIVE CONVERSION! ✅
      */
     fun onCurrencyChange(currency: String) {
         _createUiState.update { it.copy(selectedCurrency = currency) }
+
+        // Recalculate conversion when currency changes
+        val currentPrice = _createUiState.value.price.toDoubleOrNull() ?: 0.0
+        if (currentPrice > 0) {
+            viewModelScope.launch {
+                try {
+                    val convertedAmount = if (currency == "USD") {
+                        currentPrice
+                    } else {
+                        val rate = exchangeRateRepo.getExchangeRate(currency, "USD")
+                        currentPrice * rate
+                    }
+                    _createUiState.update {
+                        it.copy(convertedPriceUSD = String.format("%.2f", convertedAmount))
+                    }
+                } catch (e: Exception) {
+                    _createUiState.update {
+                        it.copy(convertedPriceUSD = String.format("%.2f", currentPrice))
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -334,5 +389,6 @@ data class CreateListingUiState(
     val error: String? = null,
     val titleError: String? = null,
     val priceError: String? = null,
-    val descriptionError: String? = null
+    val descriptionError: String? = null,
+    val convertedPriceUSD: String = "0.00"  // ✅ ADDED
 )
